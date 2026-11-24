@@ -882,9 +882,9 @@ class AgentOrchestrator(
                 }
                 MessageRole.TOOL -> LlmMessage(
                     role = "tool",
-                    // Poda SUAVE: o DB/UI guarda o output completo; só o que vai ao LLM é
-                    // limitado a 6.000 chars. Evita que um log enorme de tool estoure tokens.
-                    content = entity.content.take(6000),
+                    // Poda: o DB/UI guarda o output completo; só o que vai ao LLM é
+                    // limitado a 3.000 chars. Evita que um log enorme de tool estoure tokens.
+                    content = entity.content.take(3000),
                     toolCallId = entity.toolCallId,
                     toolName = entity.toolName
                 )
@@ -899,7 +899,15 @@ class AgentOrchestrator(
                 )
             }
         }
-        return listOf(systemMessage) + history
+
+        // TOKENS: limita o histórico reenviado. O DB mantém tudo (para UI/checkpoints),
+        // mas só as últimas mensagens vão ao LLM. Corte SEGURO: nunca começa num
+        // tool result órfão (a API exige assistant + tool_calls antes do tool result).
+        var trimmed = history.takeLast(24)
+        while (trimmed.isNotEmpty() && trimmed.first().role == "tool") {
+            trimmed = trimmed.drop(1)
+        }
+        return listOf(systemMessage) + trimmed
     }
 
     // ------------------------------------------------------------------
