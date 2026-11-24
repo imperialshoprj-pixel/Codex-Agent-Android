@@ -542,7 +542,9 @@ class AgentOrchestrator(
                         "Tente novamente em instantes, ou troque o modelo na tela de Provedores " +
                         "(ex.: use outro modelo ou o provedor OpenRouter)."
                     msg.contains("429", true) ->
-                        "\n\n💡 Limite de requisições atingido. Aguarde alguns segundos ou troque de modelo/provedor."
+                        "\n\n💡 Limite de requisições atingido (429). Em provedores free o limite é DIÁRIO — " +
+                        "verifique o horário de reset no erro ou troque para outro provedor com key " +
+                        "(ex.: Gemini, Groq). Adicionar crédito no OpenRouter também libera mais requisições."
                     msg.contains("401", true) || msg.contains("403", true) ->
                         "\n\n💡 Verifique a API Key na tela de Provedores."
                     else -> ""
