@@ -1,9 +1,185 @@
 # Codex Agent — Agente de Engenharia Autônomo para Android
 
 App Android (Kotlin + Jetpack Compose) estilo OpenAI Codex / OpenCode / Claude Code, rodando
-100% nativo no dispositivo: agente de IA com ferramentas de shell, arquivos, web, APK reverse
-engineering, checkpoints Git, terminal live e compilação — sem pedidos manuais de permissão
-por passo (modo YOLO).
+100% nativo no dispositivo: agente de IA com **36 ferramentas** de shell, arquivos, web, engenharia
+reversa de APK, Git, terminal live e compilação — sem pedidos manuais de permissão por passo
+(modo YOLO). A inteligência é **100% cloud** (Gemini, OpenAI, Anthropic, Groq, OpenRouter,
+DeepSeek, Vyce) — **não baixa modelos GGUF nem roda Ollama local**.
+
+---
+
+## 📘 Tutorial: do zero ao agente funcionando (passo a passo)
+
+### Visão geral — o que você precisa baixar
+
+| # | Item | Para que serve | Obrigatório? |
+|---|---|---|---|
+| 1 | **Android Studio** (Ladybug / 2024.2+) | Compilar e instalar o APK | ✅ Sim (ou use o APK pronto) |
+| 2 | **JDK 17** (Temurin/Adoptium) | Compilador Java/Kotlin | ✅ Sim (já vem no Android Studio) |
+| 3 | **Android SDK 35** + NDK 27 | Build do app | ✅ Sim (Android Studio instala) |
+| 4 | **Uma chave de API de LLM** | O "cérebro" do agente | ✅ Sim (Gemini/OpenRouter/Groq/etc.) |
+| 5 | **Termux** (F-Droid) | Shell + ferramentas (jadx, apktool, python) no celular | ⚙️ Recomendado |
+| 6 | **Shizuku** (GitHub/F-Droid) | Permissões ADB sem root (opcional) | ⚙️ Opcional |
+| 7 | **adb** (platform-tools) | Instalar o APK via PC | ⚙️ Se instalar pelo PC |
+
+> 💡 **Não precisa mais baixar Ollama, modelos GGUF nem configurar tunnel local.** Tudo vai pela API na nuvem.
+
+---
+
+### PASSO 1 — Conseguir uma chave de API (2 min)
+
+Escolha **um** provedor. Exemplos (todos têm plano free ou crédito inicial):
+
+| Provedor | Onde pegar a key | Base URL (já vem preenchida no app) |
+|---|---|---|
+| **Google Gemini** (recomendado) | https://aistudio.google.com/apikey | `https://generativelanguage.googleapis.com/v1beta/openai/` |
+| **OpenRouter** | https://openrouter.ai/keys | `https://openrouter.ai/api/v1` |
+| **Groq** | https://console.groq.com/keys | `https://api.groq.com/openai/v1` |
+| **OpenAI** | https://platform.openai.com/api-keys | `https://api.openai.com/v1` |
+| **Anthropic** | https://console.anthropic.com | `https://api.anthropic.com/v1` (marque tipo *Anthropic*) |
+| **DeepSeek** | https://platform.deepseek.com | `https://api.deepseek.com/v1` |
+
+Copie a chave (`sk-...` / `AIza...`). **Nunca compartilhe nem commite sua key.**
+
+---
+
+### PASSO 2 — Instalar o app no celular
+
+**Opção A — pelo Android Studio (do código-fonte):**
+
+```bash
+git clone https://github.com/imperialshoprj-pixel/CodexAgent.git
+cd CodexAgent
+# Abra a pasta no Android Studio → Sync Gradle → Build > Make Project
+# Depois: Run (▶) com o celular conectado via USB
+```
+
+Ou via linha de comando (com JDK 17 e SDK configurados):
+
+```bash
+./gradlew :app:assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk
+```
+
+**Opção B — baixar o APK pronto:** abra a aba **Releases** deste repo, baixe o `.apk` e instale
+(no Android, permita "Instalar apps desconhecidos" para o seu gerenciador de arquivos).
+
+> Requisitos do celular: Android 7+ (minSdk 24), ~150 MB livres, conexão com a internet.
+
+---
+
+### PASSO 3 — Configurar a API no app (1 min)
+
+1. Abra o **Codex Agent** → toque na aba **APIs** (barra inferior).
+2. Você verá os provedores já cadastrados (OpenAI, Gemini, OpenRouter, Groq, Anthropic, DeepSeek, Vyce).
+3. Toque no **lápis ✏️** ao lado do provedor que você escolheu.
+4. Preencha:
+   - **API Key**: cole a chave do Passo 1.
+   - **Modelo Principal (Coder)**: ex.: `gemini-2.5-flash`, `gpt-4o-mini`, `llama-3.3-70b-versatile`.
+   - **Modelo Econômico (Resumo)**: um modelo mais barato para tarefas leves (ex.: `gemini-2.0-flash-lite`).
+   - **Base URL**: já vem preenchida — só altere se o provedor mudou o endpoint.
+5. Toque em **🔍 Puxar Modelos da API** para ver a lista real liberada pela sua key (o app preenche os modelos automaticamente).
+6. Toque em **Testar** — deve aparecer `Conexão OK (... tokens)`.
+7. Toque em **Salvar**. Depois toque no **card do provedor** para marcá-lo como **padrão** (✓ verde).
+
+> 🔐 A key fica no **Android Keystore** (EncryptedSharedPreferences), nunca em texto puro.
+
+---
+
+### PASSO 4 — Permissões (para ferramentas locais)
+
+Na primeira abertura, o app mostra um aviso de setup. Conceda:
+
+- **Armazenamento** (todos os arquivos) — para ler/escrever em `/sdcard/CodexProjects`.
+- **Termux** (opcional, mas recomendado): instale pelo F-Droid e, no Termux, rode:
+  ```bash
+  pkg update && pkg install -y python git curl wget openjdk-17 android-tools
+  ```
+  Isso habilita `execute_shell`, jadx/apktool (via ToolHub) e build de APK no próprio celular.
+- **Shizuku** (opcional): instale, ative pelo app e autorize o Codex Agent — dá acesso ADB sem root para `device_manager`.
+
+> O agente funciona **mesmo sem Termux/Shizuku** — só as ferramentas de shell local ficam limitadas.
+
+---
+
+### PASSO 5 — Usar o agente
+
+1. Vá na aba **Agente** (barra inferior).
+2. No campo "Pergunte qualquer coisa...", escreva o pedido em português. Exemplos:
+
+   ```
+   Inspecione o ambiente e me diga quais ferramentas estão instaladas
+   ```
+
+   ```
+   Faça engenharia reversa do APK /sdcard/CodexProjects/app.apk e liste os endpoints encontrados
+   ```
+
+   ```
+   Crie um projeto Android "MeuApp" em Kotlin+Compose, compile o APK e instale
+   ```
+
+   ```
+   Use apk_analyzer_tool para auditar o APK do meu app e gere um relatório de segurança
+   ```
+
+3. O agente trabalha **autonomamente**: a cada passo você vê o status ("Passo 1/50 — executando [...]"), as ferramentas sendo chamadas e o contador de tokens no topo.
+4. Para interromper, toque em **Parar** (■) no campo de envio.
+5. Dica: o modo **YOLO** (toggle no topo) executa sem pedir confirmação. Use com cuidado no workspace correto.
+
+> ⚙️ O workspace padrão é `/sdcard/CodexProjects`. Coloque seus APKs/arquivos lá.
+
+---
+
+### PASSO 6 — Ferramentas disponíveis (36)
+
+O agente tem acesso a: `execute_shell`, `file_manager`, `patch_file`, `search_code`,
+`search_semantic`, `web_fetch_and_download`, `install_dependency`, `android_system_tool`,
+`manage_checkpoints`, `apk_analyzer_tool`, `mac_spoof`, `anticheat_audit`, `android_build_tool`,
+`tool_hub`, `frida_tool`, `apk_security_audit`, `git_manager`, `delegate_task`, `mcp_client`,
+`deep_re`, `memory_analyzer`, `learning_store`, `observability`, `re_toolkit`, `sdr_tool`,
+`device_manager`, `web_tool`, `swarm_tool`, `tool_factory`, `dev_knowledge`, `dex_studio`,
+`tvbox_re`, `linuxbox_re`, `web_security`, `pe_analyzer` — todas visíveis ao modelo via schemas
+compactos (nenhuma escondida).
+
+O **ToolHub** (`tool_hub`) instala sob demanda: apktool, jadx, smali/baksmali, dex2jar,
+uber-apk-signer, bundletool, frida, radare2, apkleaks, androguard, e muito mais — sempre com
+verificação real pós-instalação.
+
+---
+
+### PASSO 7 — Consumo de tokens (dica importante)
+
+Cada passo do agente reenvia o system prompt + os schemas das 36 ferramentas. Uma mensagem
+simples custa ~7.000 tokens; uma tarefa complexa (5 passos) ~25.000. Para economizar:
+
+- Use um provedor com **prompt caching** (Anthropic/OpenAI) quando possível.
+- Escolha modelos "flash/mini/lite" como principal — são rápidos e baratos.
+- O app já aplica compactação de contexto e schema enxuto automaticamente.
+
+---
+
+### ❓ Solução de problemas
+
+| Sintoma | Causa provável | Solução |
+|---|---|---|
+| "Nenhum provedor configurado" | Key não salva | Aba APIs → editar → colar key → Testar → Salvar |
+| "Falha 401/403" | Key inválida ou sem permissão | Gerar nova key no provedor |
+| "Falha 404" | Base URL errada | Use exatamente a URL da tabela do Passo 1 |
+| "Comando não encontrado" | Termux não instalado | Instalar Termux + `pkg install ...` (Passo 4) |
+| "Sem permissão de arquivo" | Permissão de storage negada | Config. do Android → Permissões → Arquivos |
+| Contador de tokens não zera | Acumulativo da sessão | Toque em "Limpar Chat" no topo |
+
+---
+
+### ⚠️ Uso responsável
+
+Este é um projeto de **engenharia reversa e automação legítima**: audite seus próprios APKs,
+sistemas e sites. **Não use para** ataques, invasão de dispositivos de terceiros, pirataria,
+bypass de anti-cheat, DDoS ou vigilância. Guardrails contra comandos destrutivos e path traversal
+permanecem ativos.
+
+---
 
 ## Stack fixada
 
