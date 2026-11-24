@@ -574,8 +574,23 @@ fun AgentChatScreen(
                                         rawText
                                     }
 
-                                    if (finalPrompt.isNotBlank()) {
-                                        orchestrator.submitUserPrompt(finalPrompt, image)
+                                    // Comandos locais (nao consomem API): /renew e /status.
+                                    val cmd = rawText.lowercase().trim()
+                                    when {
+                                        cmd == "/renew" || cmd == "/renew-session" -> {
+                                            scope.launch { orchestrator.clearConversation() }
+                                            Toast.makeText(context, "Sessão renovada — tokens e histórico zerados.", Toast.LENGTH_SHORT).show()
+                                        }
+                                        cmd == "/status" -> {
+                                            val provedor = activeProvider?.let { "${it.name} / ${it.mainModel}" } ?: "não configurado"
+                                            val tok = String.format(java.util.Locale.getDefault(), "%,d", uiState.totalTokensUsed)
+                                            Toast.makeText(
+                                                context,
+                                                "Status: $provedor · $tok tokens · passo ${uiState.statusText}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                        finalPrompt.isNotBlank() -> orchestrator.submitUserPrompt(finalPrompt, image)
                                     }
                                 }
                         ) {

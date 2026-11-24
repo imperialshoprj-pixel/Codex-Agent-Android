@@ -880,7 +880,9 @@ class AgentOrchestrator(
                 }
                 MessageRole.TOOL -> LlmMessage(
                     role = "tool",
-                    content = entity.content,
+                    // Poda SUAVE: o DB/UI guarda o output completo; só o que vai ao LLM é
+                    // limitado a 6.000 chars. Evita que um log enorme de tool estoure tokens.
+                    content = entity.content.take(6000),
                     toolCallId = entity.toolCallId,
                     toolName = entity.toolName
                 )
