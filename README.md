@@ -7,6 +7,10 @@
 [![Forks](https://img.shields.io/github/forks/imperialshoprj-pixel/Codex-Agent?style=social)](https://github.com/imperialshoprj-pixel/Codex-Agent/forks)
 [![Issues](https://img.shields.io/github/issues/imperialshoprj-pixel/Codex-Agent)](https://github.com/imperialshoprj-pixel/Codex-Agent/issues)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Latest Release](https://img.shields.io/github/v/release/imperialshoprj-pixel/Codex-Agent?style=for-the-badge&color=3DDC84)](https://github.com/imperialshoprj-pixel/Codex-Agent/releases/latest)
+[![Download APK](https://img.shields.io/badge/⬇️-Download%20APK-3DDC84?style=for-the-badge)](https://github.com/imperialshoprj-pixel/Codex-Agent/releases/latest/download/codex-agent-v1.0.0.apk)
+
+> 📥 **Quer testar rápido?** Baixe o APK pronto: **[codex-agent-v1.0.0.apk (21 MB)](https://github.com/imperialshoprj-pixel/Codex-Agent/releases/latest/download/codex-agent-v1.0.0.apk)** — depois siga o tutorial abaixo (principalmente o **Passo 4 — permissões Termux/Shizuku**).
 
 App Android (Kotlin + Jetpack Compose) estilo OpenAI Codex / OpenCode / Claude Code, rodando
 100% nativo no dispositivo: agente de IA com **36 ferramentas** de shell, arquivos, web, engenharia
@@ -101,8 +105,14 @@ Ou via linha de comando (com JDK 17 e SDK configurados):
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**Opção B — baixar o APK pronto:** abra a aba **Releases** deste repo, baixe o `.apk` e instale
-(no Android, permita "Instalar apps desconhecidos" para o seu gerenciador de arquivos).
+**Opção B — baixar o APK pronto (mais fácil):**
+
+👉 **[Baixar codex-agent-v1.0.0.apk (21 MB)](https://github.com/imperialshoprj-pixel/Codex-Agent/releases/latest/download/codex-agent-v1.0.0.apk)**
+
+Ou abra a aba **Releases** → https://github.com/imperialshoprj-pixel/Codex-Agent/releases/latest
+
+Depois, no Android, permita **"Instalar apps desconhecidos"** para o seu gerenciador de arquivos
+(o app também pede essa permissão no card "Setup do Ambiente"). Instale e abra.
 
 > Requisitos do celular: Android 7+ (minSdk 24), ~150 MB livres, conexão com a internet.
 
