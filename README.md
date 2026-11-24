@@ -1,5 +1,13 @@
 # Codex Agent — Agente de Engenharia Autônomo para Android
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Android-3DDC84?logo=android&logoColor=white)](https://github.com/imperialshoprj-pixel/Codex-Agent)
+[![Kotlin](https://img.shields.io/badge/Kotlin-2.0.21-A97BFF?logo=kotlin&logoColor=white)](https://kotlinlang.org)
+[![Stars](https://img.shields.io/github/stars/imperialshoprj-pixel/Codex-Agent?style=social)](https://github.com/imperialshoprj-pixel/Codex-Agent/stargazers)
+[![Forks](https://img.shields.io/github/forks/imperialshoprj-pixel/Codex-Agent?style=social)](https://github.com/imperialshoprj-pixel/Codex-Agent/forks)
+[![Issues](https://img.shields.io/github/issues/imperialshoprj-pixel/Codex-Agent)](https://github.com/imperialshoprj-pixel/Codex-Agent/issues)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+
 App Android (Kotlin + Jetpack Compose) estilo OpenAI Codex / OpenCode / Claude Code, rodando
 100% nativo no dispositivo: agente de IA com **36 ferramentas** de shell, arquivos, web, engenharia
 reversa de APK, Git, terminal live e compilação — sem pedidos manuais de permissão por passo
