@@ -167,8 +167,23 @@ class LlmClient {
                 onReasoning = { delta -> callbacks.onReasoning(delta) },
                 onStatus = { s -> callbacks.onStatus(s) }
             )
-            val result = streamChat(provider, messages, toolsSchema, useUtilityModel, guardedCallbacks)
+            var result = streamChat(provider, messages, toolsSchema, useUtilityModel, guardedCallbacks)
             if (result.isSuccess) return@withContext result
+
+            // ROTAÇÃO AUTOMÁTICA DE MODELO: se o modelo atual atingiu 429 (pool
+            // compartilhado / cota expirada), tenta o OUTRO modelo do mesmo provedor
+            // (Coder ↔ Econômico) antes de descartar o provedor. Usa a MESMA key —
+            // apenas escolhe outro modelo liberado, sem evadir limites.
+            val err = result.exceptionOrNull()?.message.orEmpty()
+            val isQuota = err.contains("429", true) || err.contains("rate limit", true) ||
+                err.contains("quota", true) || err.contains("exhausted", true)
+            if (isQuota && !anyEmitted && provider.utilityModel.isNotBlank() &&
+                provider.utilityModel != provider.mainModel) {
+                callbacks.onStatus("Modelo ${selectModel(provider, useUtilityModel)} sem cota — trocando para ${selectModel(provider, !useUtilityModel)}…")
+                result = streamChat(provider, messages, toolsSchema, !useUtilityModel, guardedCallbacks)
+                if (result.isSuccess) return@withContext result
+            }
+
             if (index == 0) primaryError = result.exceptionOrNull()
             lastError = result.exceptionOrNull()
             if (anyEmitted) {

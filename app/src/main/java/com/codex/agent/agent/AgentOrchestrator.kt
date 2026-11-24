@@ -541,6 +541,12 @@ class AgentOrchestrator(
                         "\n\n💡 O modelo está temporariamente indisponível no provedor. " +
                         "Tente novamente em instantes, ou troque o modelo na tela de Provedores " +
                         "(ex.: use outro modelo ou o provedor OpenRouter)."
+                    msg.contains("upstream_provider_shared_pool", true) ||
+                    msg.contains("rpm_limit_exceeded", true) ||
+                    msg.contains("Provider returned error", true) ->
+                        "\n\n💡 O MODELO está com o pool compartilhado saturado (upstream), não é sua key. " +
+                        "Trocar a key NÃO resolve. Troque o modelo na tela de Provedores, use BYOK " +
+                        "(openrouter.ai/workspaces/default/byok) ou configure outro provedor (Gemini/Groq)."
                     msg.contains("429", true) ->
                         "\n\n💡 Limite de requisições atingido (429). Em provedores free o limite é DIÁRIO — " +
                         "verifique o horário de reset no erro ou troque para outro provedor com key " +
