@@ -30,8 +30,8 @@ import java.util.concurrent.TimeUnit
 
 /**
  * Cliente universal de LLM:
- * - Endpoints OpenAI-compatible (OpenAI, Gemini /v1beta/openai/, DeepSeek, OpenRouter, Groq,
- *   Ollama, LM Studio, proxies customizados) e protocolo nativo Anthropic /v1/messages.
+ * - Endpoints OpenAI-compatible (OpenAI, Gemini /v1beta/openai/, DeepSeek, OpenRouter, Groq
+ *   e proxies customizados) e protocolo nativo Anthropic /v1/messages. 100% cloud.
  * - Dual-model: modelo principal (Coder/Architect) e modelo rápido (utility) para compactação.
  * - Streaming SSE com conteúdo, raciocínio (reasoning) e acumulação de tool calls.
  * - Vision multimodal (Base64) em mensagens de usuário.
@@ -176,8 +176,8 @@ class LlmClient {
                 return@withContext result
             }
         }
-        // Reporta o erro do provedor PRINCIPAL — o do último fallback (ex.: Ollama offline)
-        // costuma ser enganoso e esconde a causa real (ex.: 503 da Vyce).
+        // Reporta o erro do provedor PRINCIPAL — o do último fallback costuma ser
+        // enganoso e esconde a causa real (ex.: 503 da Vyce).
         Result.failure(
             primaryError ?: lastError ?: IOException("Todos os provedores falharam.")
         )

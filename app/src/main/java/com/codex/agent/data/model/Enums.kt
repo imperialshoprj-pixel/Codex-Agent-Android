@@ -11,10 +11,7 @@ enum class ProviderKind {
     OPENAI_COMPATIBLE,
 
     /** Protocolo nativo /v1/messages da Anthropic (adaptador próprio, com tools nativas). */
-    ANTHROPIC_NATIVE,
-
-    /** Motor de inferência local GGUF via JNI / llama.kt (Qwen 2.5 0.5B/1.5B). */
-    LOCAL_LLAMA
+    ANTHROPIC_NATIVE
 }
 
 /** Modo de operação do agente para cada tarefa. */

@@ -40,15 +40,11 @@ class ProviderRepository(
     suspend fun fallbackChain(preferredId: Long?): List<ProviderConfigEntity> {
         val all = getAll()
         val preferred = resolvePreferred(preferredId)
-        // Filtra endpoints locais (Ollama/LM Studio) só se estiverem realmente rodando —
-        // caso contrário o fallback tenta 127.0.0.1:11434, falha e a mensagem final
-        // mostra o erro errado (do último provider) em vez do erro do provedor principal.
+        // SISTEMA 100% CLOUD: só entram na cadeia provedores com API key configurada.
+        // Nenhum endpoint local (localhost/127.0.0.1) é considerado — o agente nunca
+        // tenta comunicação com Ollama/LM Studio/outro servidor local.
         val usable = all.filter { p ->
-            when {
-                p.apiKey.isNotBlank() -> true
-                isLocalEndpoint(p.baseUrl) -> isLocalServerUp(p.baseUrl)
-                else -> false
-            }
+            p.apiKey.isNotBlank() && !isLocalEndpoint(p.baseUrl)
         }
         val result = mutableListOf<ProviderConfigEntity>()
         if (preferred != null) result.add(preferred)
@@ -101,6 +97,16 @@ class ProviderRepository(
     }
 
     suspend fun ensureDefaultTemplates() {
+        // LIMPEZA DEFINITIVA: remove qualquer provedor local órfão (Ollama / LM Studio /
+        // 127.0.0.1:11434) de instalações antigas. O sistema é 100% cloud — nenhum
+        // provedor local deve permanecer no DB nem entrar na cadeia de fallback.
+        dao.getAll().filter { p ->
+            p.name.contains("ollama", ignoreCase = true) ||
+            p.baseUrl.contains("11434") ||
+            p.baseUrl.contains("localhost") ||
+            p.baseUrl.contains("127.0.0.1")
+        }.forEach { dao.deleteById(it.id) }
+
         val existingNames = dao.getAll().map { it.name }.toSet()
         val now = System.currentTimeMillis()
         val templates = listOf(
@@ -164,17 +170,5 @@ class ProviderRepository(
         val lower = baseUrl.lowercase()
         return lower.contains("localhost") || lower.contains("127.0.0.1") ||
             lower.contains("10.0.2.2") || lower.contains("192.168.")
-    }
-
-    /** Verifica rapidamente se um servidor local (Ollama/LM Studio) está aceitando conexões. */
-    private fun isLocalServerUp(baseUrl: String): Boolean {
-        return runCatching {
-            val url = java.net.URL(if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/")
-            val conn = url.openConnection() as java.net.HttpURLConnection
-            conn.connectTimeout = 300
-            conn.readTimeout = 300
-            conn.requestMethod = "GET"
-            try { conn.connect(); true } finally { conn.disconnect() }
-        }.getOrDefault(false)
     }
 }
