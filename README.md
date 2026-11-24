@@ -16,6 +16,38 @@ DeepSeek, Vyce) — **não baixa modelos GGUF nem roda Ollama local**.
 
 ---
 
+## 🎯 O que é o Codex Agent / O que o sistema faz
+
+**Em uma frase:** é um agente de IA autônomo que roda dentro do seu celular android e executa
+tarefas reais de engenharia — você dá o pedido em português e ele usa ferramentas sozinho,
+passo a passo, até concluir.
+
+### 🔢 Números do sistema
+
+| Métrica | Valor |
+|---|---|
+| **Ferramentas nativas disponíveis ao agente** | **36** (todas visíveis ao modelo, nenhuma escondida) |
+| **Receitas do ToolHub** | **32+** (jadx, apktool, frida, radare2, ghidra, ...) |
+| **Provedores de IA suportados** | **7** (Gemini, OpenAI, Anthropic, Groq, OpenRouter, DeepSeek, Vyce) |
+| **Modelos por provedor** | **2** (um "Coder" principal + um "Econômico" para resumos) |
+| **Modelo local / GGUF / Ollama** | ❌ Nenhum — 100% cloud |
+| **Passos autônomos por tarefa** | Configurável (padrão 50, até 200) |
+
+### 🧠 O que o agente é capaz de fazer
+
+- 🔧 **Shell e arquivos** — executar comandos (com guardrail de segurança), ler/escrever/patchar arquivos, buscar código.
+- 📱 **Engenharia reversa de APK** — apktool, jadx, smali/baksmali, dex2jar, Frida, radare2, auditoria de segurança (componentes exportados, secrets hardcoded, WebView inseguro).
+- 🏗️ **Build de APK no próprio celular** — scaffold de projeto → edição → `aapt2 → javac → d8 → apksigner` → APK instalado, sem PC.
+- 🌐 **Web e APIs** — fetch/analyze de sites próprios, MCP client, integração com repositórios legítimos via ToolHub.
+- 🗃️ **Git e checkpoints** — status/diff/commit/push, rollback com 1 toque via shadow commits.
+- 🤖 **Multi-agente** — `delegate_task` e `swarm_tool` para paralelizar investigações com contexto isolado.
+- 💾 **Memória e RAG** — indexação TF-IDF local, memória de longo prazo entre sessões, compactação automática de contexto.
+- 🛡️ **Segurança** — guardrails contra comandos destrutivos, path traversal, anti-injeção de prompt, chaves no Android Keystore.
+
+> ⚙️ **Modo YOLO:** por padrão o agente executa sem pedir confirmação a cada passo. Use com atenção no workspace correto (`/sdcard/CodexProjects`).
+
+---
+
 ## 📘 Tutorial: do zero ao agente funcionando (passo a passo)
 
 ### Visão geral — o que você precisa baixar
@@ -26,8 +58,8 @@ DeepSeek, Vyce) — **não baixa modelos GGUF nem roda Ollama local**.
 | 2 | **JDK 17** (Temurin/Adoptium) | Compilador Java/Kotlin | ✅ Sim (já vem no Android Studio) |
 | 3 | **Android SDK 35** + NDK 27 | Build do app | ✅ Sim (Android Studio instala) |
 | 4 | **Uma chave de API de LLM** | O "cérebro" do agente | ✅ Sim (Gemini/OpenRouter/Groq/etc.) |
-| 5 | **Termux** (F-Droid) | Shell + ferramentas (jadx, apktool, python) no celular | ⚙️ Recomendado |
-| 6 | **Shizuku** (GitHub/F-Droid) | Permissões ADB sem root (opcional) | ⚙️ Opcional |
+| 5 | **Termux** (F-Droid) | Shell + ferramentas (jadx, apktool, python) no celular | ⚠️ **SIM — configure a ponte (Passo 4)** |
+| 6 | **Shizuku** (F-Droid) | Permissões ADB sem root no Codex Agent | ⚠️ **SIM — autorize no app (Passo 4)** |
 | 7 | **adb** (platform-tools) | Instalar o APK via PC | ⚙️ Se instalar pelo PC |
 
 > 💡 **Não precisa mais baixar Ollama, modelos GGUF nem configurar tunnel local.** Tudo vai pela API na nuvem.
@@ -94,19 +126,57 @@ adb install app/build/outputs/apk/debug/app-debug.apk
 
 ---
 
-### PASSO 4 — Permissões (para ferramentas locais)
+### PASSO 4 — ⚠️ PERMISSÕES OBRIGATÓRIAS (Termux + Shizuku) — LEIA COM ATENÇÃO
 
-Na primeira abertura, o app mostra um aviso de setup. Conceda:
+> 🚨 **AVISO IMPORTANTE:** para o agente funcionar **perfeito**, você **PRECISA**
+> conceder as permissões do **Termux** e do **Shizuku** dentro das configurações do próprio
+> **Codex Agent**. Sem isso, as ferramentas de shell, engenharia reversa e ADB **não funcionam**
+> (o agente até responde, mas não executa nada no dispositivo). Não pule este passo!
 
-- **Armazenamento** (todos os arquivos) — para ler/escrever em `/sdcard/CodexProjects`.
-- **Termux** (opcional, mas recomendado): instale pelo F-Droid e, no Termux, rode:
-  ```bash
-  pkg update && pkg install -y python git curl wget openjdk-17 android-tools
-  ```
-  Isso habilita `execute_shell`, jadx/apktool (via ToolHub) e build de APK no próprio celular.
-- **Shizuku** (opcional): instale, ative pelo app e autorize o Codex Agent — dá acesso ADB sem root para `device_manager`.
+Ao abrir o app pela primeira vez, aparece o card **"Setup do Ambiente (Dev & APK RE)"** na tela
+do Agente. Ele mostra botões para cada item pendente. Conceda **todos**:
 
-> O agente funciona **mesmo sem Termux/Shizuku** — só as ferramentas de shell local ficam limitadas.
+| Botão no app | O que faz | Por que é necessário |
+|---|---|---|
+| **Liberar Arquivos** | Armazenamento (todos os arquivos) | Ler/escrever em `/sdcard/CodexProjects` (APKs, projetos, patch_file) |
+| **Permitir Instalar APKs** | Instalar apps desconhecidos | O agente instala os APKs que ele mesmo compila |
+| **Copiar Config Termux** | Copia o comando `allow-external-apps=true` | **Essencial**: sem isso o Codex Agent não consegue executar comandos no Termux (`execute_shell`) |
+| **Autorizar Shizuku** | `Shizuku.requestPermission()` | **Essencial** para `device_manager`, ADB sem root e permissões elevadas |
+| **Instalar Toolchain (JADX/Apktool/JDK)** | Baixa e instala apktool/jadx/JDK/Python | Habilita engenharia reversa e build de APK (o app já faz isso automático no 1º boot) |
+
+#### 4.1 — Configurar o Termux (passo a passo)
+
+1. Instale o **Termux** pelo **F-Droid** (a versão da Play Store é antiga e não funciona com a ponte).
+2. No card "Setup do Ambiente" do Codex Agent, toque em **Copiar Config Termux**.
+3. Abra o Termux, **cole** o comando e pressione Enter. Ele vai:
+   - adicionar `allow-external-apps=true` em `~/.termux/termux.properties`
+   - recarregar as configurações (`termux-reload-settings`)
+   - criar o flag `/sdcard/.codex_agent_bridge/.ready` que o app usa para detectar a ponte
+4. Ainda no Termux, instale as ferramentas básicas:
+   ```bash
+   pkg update && pkg install -y python git curl wget openjdk-17 android-tools
+   ```
+5. Volte ao Codex Agent, toque no ícone **🔄 Atualizar** do card. O ícone ao lado de
+   "Setup do Ambiente" deve virar **✅ (check verde)**.
+
+#### 4.2 — Configurar o Shizuku (passo a passo)
+
+1. Instale o **Shizuku** (F-Droid ou GitHub releases).
+2. Ative o Shizuku no app dele (via ADB sem fio ou, se tiver root, pelo modo root).
+3. Volte ao Codex Agent → card "Setup do Ambiente" → toque em **Autorizar Shizuku**
+   (só aparece se o Shizuku estiver rodando).
+4. Confira: o check verde aparece quando a permissão foi concedida.
+
+> 💡 **Sem Root?** Use o Shizuku via ADB sem fio: no app do Shizuku → "Iniciar via ADB sem fio" →
+> siga as instruções (depuração USB → `adb tcpip 5555`). O Codex Agent também tem a ferramenta
+> `device_manager` com `pair_wifi`/`connect_wifi` para isso.
+
+> ✅ **Resultado esperado:** quando **todos** os checks do card ficam verdes
+> (arquivos ✅, instalar APK ✅, ponte Termux ✅, apktool ✅, jadx ✅, Shizuku ✅),
+> o card desaparece e o agente está pronto para funcionar 100%.
+
+> ⚠️ O agente **até conversa sem essas permissões**, mas não executa ferramentas locais.
+> Se você pedir "inspecione o ambiente" e ele não rodar comandos, volte aqui e configure.
 
 ---
 
@@ -174,8 +244,10 @@ simples custa ~7.000 tokens; uma tarefa complexa (5 passos) ~25.000. Para econom
 | "Nenhum provedor configurado" | Key não salva | Aba APIs → editar → colar key → Testar → Salvar |
 | "Falha 401/403" | Key inválida ou sem permissão | Gerar nova key no provedor |
 | "Falha 404" | Base URL errada | Use exatamente a URL da tabela do Passo 1 |
-| "Comando não encontrado" | Termux não instalado | Instalar Termux + `pkg install ...` (Passo 4) |
-| "Sem permissão de arquivo" | Permissão de storage negada | Config. do Android → Permissões → Arquivos |
+| "Agente não executa nada / não roda comandos" | **Ponte Termux ou Shizuku não autorizada** | Volte ao **Passo 4** — configure `allow-external-apps` e autorize Shizuku no app |
+| "Comando não encontrado" | Termux sem as ferramentas | Instalar Termux + `pkg install ...` (Passo 4.1) |
+| "Setup do Ambiente" não some | Falta algum check verde | Toque em 🔄 Atualizar e conceda todos os itens do card |
+| "Sem permissão de arquivo" | Permissão de storage negada | Card "Setup" → **Liberar Arquivos** (Passo 4) |
 | Contador de tokens não zera | Acumulativo da sessão | Toque em "Limpar Chat" no topo |
 
 ---
