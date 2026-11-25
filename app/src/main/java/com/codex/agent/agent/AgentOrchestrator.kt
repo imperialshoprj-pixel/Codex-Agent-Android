@@ -518,11 +518,18 @@ class AgentOrchestrator(
             // Agent memory file: só cria se não existir (evita I/O repetido)
             ensureAgentMemoryFile(workspaceRoot)
 
-            // TODAS as 35 ferramentas expostas ao LLM, com schemas compactos
-            // (descrição curta, nomes e parâmetros intactos). Nenhuma ferramenta
-            // fica escondida e o consumo de tokens cai ~70% vs. schemas completos.
-            val toolsSchema = ToolDefinitions.getAllToolsSchemaCompact(workspaceRoot)
-            val messages = buildContextMessages(session)
+            // Schemas: provedores locais (ex.: Jan 2B com ctx 2048) recebem o schema
+            // MÍNIMO (só nomes) para caber no contexto; provedores cloud recebem o
+            // compacto com parâmetros. NENHUMA ferramenta é escondida em nenhum caso.
+            val isLocalProvider = provider.baseUrl.contains("127.0.0.1") ||
+                provider.baseUrl.contains("localhost") ||
+                provider.baseUrl.contains("192.168.")
+            val toolsSchema = if (isLocalProvider) {
+                ToolDefinitions.getAllToolsSchemaMinimal(workspaceRoot)
+            } else {
+                ToolDefinitions.getAllToolsSchemaCompact(workspaceRoot)
+            }
+            val messages = buildContextMessages(session, isLocal = isLocalProvider)
 
             _streamingText.value = ""
             _streamingReasoning.value = ""
@@ -771,7 +778,8 @@ class AgentOrchestrator(
 
     private suspend fun buildContextMessages(
         session: AgentSessionEntity,
-        extraInstruction: String? = null
+        extraInstruction: String? = null,
+        isLocal: Boolean = false
     ): List<LlmMessage> {
         val workspaceRoot = workspaceRepository.byId(session.workspaceId)?.rootPath
             ?: Constants.DEFAULT_WORKSPACE_ROOT
@@ -785,7 +793,7 @@ class AgentOrchestrator(
         val isFirstStep = lastUserIndex == sessionMessages.lastIndex
 
         val agentMemory = if (isFirstStep) File(workspaceRoot, Constants.AGENT_MEMORY_FILE)
-            .takeIf { it.exists() }?.readText()?.take(6000).orEmpty() else ""
+            .takeIf { it.exists() }?.readText()?.take(if (isLocal) 800 else 6000).orEmpty() else ""
 
         // RAG auto-injection: busca semantica dos arquivos mais relevantes para a ultima
         // mensagem do usuario e injeta no system prompt (top-5). SÓ no primeiro passo.
@@ -793,7 +801,7 @@ class AgentOrchestrator(
             .filter { it.role == MessageRole.USER }
             .lastOrNull()?.content
         lastUserQueryForPrompt = lastUserQuery
-        val ragContext = if (isFirstStep && !lastUserQuery.isNullOrBlank()) {
+        val ragContext = if (isFirstStep && !lastUserQuery.isNullOrBlank() && !isLocal) {
             runCatching {
                 val index = cachedCodebaseIndex?.takeIf { !it.isStale(workspaceRoot) }
                     ?: CodebaseIndex(workspaceRoot).also { it.buildIndex(); cachedCodebaseIndex = it }
@@ -810,7 +818,7 @@ class AgentOrchestrator(
 
         // MEMÓRIA DE LONGO PRAZO: lembra de tarefas/descobertas de sessões anteriores.
         // SÓ no primeiro passo (evita reenviar ~900 tokens em cada passo seguinte).
-        val longTermMemory = if (!isFirstStep) "" else runCatching {
+        val longTermMemory = if (!isFirstStep || isLocal) "" else runCatching {
             val terms = lastUserQuery?.split(Regex("\\s+"))?.filter { it.length >= 4 }?.take(3).orEmpty()
             val relevant = if (terms.isNotEmpty()) {
                 terms.flatMap { db.chatMessageDao().searchAcrossSessions(it, 5) }
@@ -861,7 +869,12 @@ class AgentOrchestrator(
         // Componentes caros (addendum/RAG/memória) entram SÓ quando relevantes ao pedido.
         val systemMessage = LlmMessage(
             role = "system",
-            content = buildUniversalSystemPrompt(
+            content = if (isLocal) {
+                // Prompt ULTRA-ENXUTO para modelos locais com ctx pequeno (ex.: Jan 2B / 2048).
+                "Você é o Codex Agent. Responda em português, de forma direta. " +
+                "Para usar ferramentas responda: TOOL: nome | chave=valor. " +
+                "Quando concluir, comece com '✅ Concluído:'. Workspace: $workspaceRoot"
+            } else buildUniversalSystemPrompt(
                 workspaceRoot = workspaceRoot,
                 envInfo = envInfo,
                 agentMemory = agentMemory,
@@ -888,9 +901,9 @@ class AgentOrchestrator(
                 }
                 MessageRole.TOOL -> LlmMessage(
                     role = "tool",
-                    // Poda: o DB/UI guarda o output completo; só o que vai ao LLM é
-                    // limitado a 3.000 chars. Evita que um log enorme de tool estoure tokens.
-                    content = entity.content.take(3000),
+                    // Poda: o DB/UI guarda o output completo; só o que vai ao LLM é limitado.
+                    // Modelos locais (ctx pequeno) recebem menos; cloud recebe 3.000 chars.
+                    content = entity.content.take(if (isLocal) 500 else 3000),
                     toolCallId = entity.toolCallId,
                     toolName = entity.toolName
                 )
@@ -909,7 +922,7 @@ class AgentOrchestrator(
         // TOKENS: limita o histórico reenviado. O DB mantém tudo (para UI/checkpoints),
         // mas só as últimas mensagens vão ao LLM. Corte SEGURO: nunca começa num
         // tool result órfão (a API exige assistant + tool_calls antes do tool result).
-        var trimmed = history.takeLast(24)
+        var trimmed = history.takeLast(if (isLocal) 2 else 24)
         while (trimmed.isNotEmpty() && trimmed.first().role == "tool") {
             trimmed = trimmed.drop(1)
         }

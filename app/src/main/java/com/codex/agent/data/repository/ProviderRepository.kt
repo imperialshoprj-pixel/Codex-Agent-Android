@@ -44,7 +44,8 @@ class ProviderRepository(
         // Nenhum endpoint local (localhost/127.0.0.1) é considerado — o agente nunca
         // tenta comunicação com Ollama/LM Studio/outro servidor local.
         val usable = all.filter { p ->
-            p.apiKey.isNotBlank() && !isLocalEndpoint(p.baseUrl)
+            val isJan = p.name.contains("jan", ignoreCase = true)
+            (p.apiKey.isNotBlank() && !isLocalEndpoint(p.baseUrl)) || (isJan && p.baseUrl.contains("1337"))
         }
         val result = mutableListOf<ProviderConfigEntity>()
         if (preferred != null) result.add(preferred)
@@ -101,10 +102,13 @@ class ProviderRepository(
         // 127.0.0.1:11434) de instalações antigas. O sistema é 100% cloud — nenhum
         // provedor local deve permanecer no DB nem entrar na cadeia de fallback.
         dao.getAll().filter { p ->
-            p.name.contains("ollama", ignoreCase = true) ||
-            p.baseUrl.contains("11434") ||
-            p.baseUrl.contains("localhost") ||
-            p.baseUrl.contains("127.0.0.1")
+            val isJan = p.name.contains("jan", ignoreCase = true)
+            !isJan && (
+                p.name.contains("ollama", ignoreCase = true) ||
+                p.baseUrl.contains("11434") ||
+                p.baseUrl.contains("localhost") ||
+                p.baseUrl.contains("127.0.0.1")
+            )
         }.forEach { dao.deleteById(it.id) }
 
         val existingNames = dao.getAll().map { it.name }.toSet()

@@ -114,6 +114,28 @@ object ToolDefinitions {
         }
     }
 
+    /**
+     * Schema MÍNIMO para modelos locais com contexto pequeno (ex.: Jan Qwen 2B, 2048 tokens).
+     * Mantém TODAS as 36 ferramentas (nome + descrição curta), mas omite os parâmetros —
+     * o prompt cai de ~7.400 para ~1.500 tokens, cabendo no ctx limitado.
+     */
+    fun getAllToolsSchemaMinimal(workspacePath: String): JsonArray = buildJsonArray {
+        getAllToolsSchema(workspacePath).forEach { tool ->
+            val fn = tool.jsonObject["function"]?.jsonObject ?: return@forEach
+            val name = fn["name"]?.jsonPrimitive?.content ?: return@forEach
+            val shortDesc = (fn["description"]?.jsonPrimitive?.content ?: name)
+                .substringBefore('.').trim().ifBlank { name }
+            add(buildJsonObject {
+                put("type", "function")
+                put("function", buildJsonObject {
+                    put("name", name)
+                    // Sem descrição: modelo local com ctx 2048 não comporta descrições.
+                    // O nome da ferramenta já indica sua função (execute_shell, file_manager...).
+                })
+            })
+        }
+    }
+
     /** Ferramentas de leitura/análise disponíveis para sub-agentes (contexto isolado). */
     fun getSubAgentToolsSchema(workspacePath: String): JsonArray = buildJsonArray {
         listOf(
