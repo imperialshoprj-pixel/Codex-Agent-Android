@@ -870,10 +870,15 @@ class AgentOrchestrator(
         val systemMessage = LlmMessage(
             role = "system",
             content = if (isLocal) {
-                // Prompt ULTRA-ENXUTO para modelos locais com ctx pequeno (ex.: Jan 2B / 2048).
-                "Você é o Codex Agent. Responda em português, de forma direta. " +
-                "Para usar ferramentas responda: TOOL: nome | chave=valor. " +
-                "Quando concluir, comece com '✅ Concluído:'. Workspace: $workspaceRoot"
+                // Prompt ENXUTO para modelos locais (ex.: Jan 2B): direto, mas com
+                // instrução CLARA de que deve EXECUTAR ferramentas para cumprir o pedido.
+                "Você é o Codex Agent, engenheiro autônomo. Responda em português. " +
+                "EXECUTE as ferramentas disponíveis para realizar o pedido do usuário — " +
+                "não apenas explique. Para chamar uma ferramenta responda EXATAMENTE: " +
+                "TOOL: nome | chave=valor | chave2=valor2 (use os parâmetros do schema). " +
+                "Após cada ferramenta continue até concluir. " +
+                "Ao final, responda começando com '✅ Concluído:'. " +
+                "Workspace: $workspaceRoot"
             } else buildUniversalSystemPrompt(
                 workspaceRoot = workspaceRoot,
                 envInfo = envInfo,

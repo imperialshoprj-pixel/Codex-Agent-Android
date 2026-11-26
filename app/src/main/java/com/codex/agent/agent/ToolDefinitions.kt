@@ -115,9 +115,10 @@ object ToolDefinitions {
     }
 
     /**
-     * Schema MÍNIMO para modelos locais com contexto pequeno (ex.: Jan Qwen 2B, 2048 tokens).
-     * Mantém TODAS as 36 ferramentas (nome + descrição curta), mas omite os parâmetros —
-     * o prompt cai de ~7.400 para ~1.500 tokens, cabendo no ctx limitado.
+     * Schema para modelos locais (ex.: Jan Qwen 2B): TODAS as 36 ferramentas com
+     * nome + descrição curta + parâmetros (type/enum/required), mas sem descrições
+     * de parâmetro. O modelo PRECISA dos parâmetros para saber chamar corretamente —
+     * sem eles fica "perdido" e não obedece. Compromisso: ~2.500 tokens (cabe em ctx 4096+).
      */
     fun getAllToolsSchemaMinimal(workspacePath: String): JsonArray = buildJsonArray {
         getAllToolsSchema(workspacePath).forEach { tool ->
@@ -125,12 +126,29 @@ object ToolDefinitions {
             val name = fn["name"]?.jsonPrimitive?.content ?: return@forEach
             val shortDesc = (fn["description"]?.jsonPrimitive?.content ?: name)
                 .substringBefore('.').trim().ifBlank { name }
+            val compactParams = fn["parameters"]?.jsonObject?.let { params ->
+                buildJsonObject {
+                    put("type", "object")
+                    params["properties"]?.jsonObject?.let { props ->
+                        put("properties", buildJsonObject {
+                            props.forEach { (key, value) ->
+                                val p = value.jsonObject
+                                put(key, buildJsonObject {
+                                    p["type"]?.let { put("type", it) }
+                                    p["enum"]?.let { put("enum", it) }
+                                })
+                            }
+                        })
+                    }
+                    params["required"]?.let { put("required", it) }
+                }
+            }
             add(buildJsonObject {
                 put("type", "function")
                 put("function", buildJsonObject {
                     put("name", name)
-                    // Sem descrição: modelo local com ctx 2048 não comporta descrições.
-                    // O nome da ferramenta já indica sua função (execute_shell, file_manager...).
+                    put("description", shortDesc)
+                    if (compactParams != null) put("parameters", compactParams)
                 })
             })
         }
